@@ -1,14 +1,9 @@
 use std::cmp::Ordering;
 
-/*
-value: valor no nó da árvore
-left: struct à esquerda do nó da árvore
-right: struct à direita do nó da árvore
-*/
 pub struct BinTree<T: Ord> {
-    value: T,
-    left: Option<Box<BinTree<T>>>,
-    right: Option<Box<BinTree<T>>>,
+    value: T,                       // valor no nó da árvore
+    left: Option<Box<BinTree<T>>>,  // struct à esquerda do nó da árvore
+    right: Option<Box<BinTree<T>>>, // struct à direita do nó da árvore
 }
 
 impl<T: Ord> BinTree<T> {
@@ -40,6 +35,34 @@ impl<T: Ord> BinTree<T> {
         }
     }
 
+    fn insert_iter(&mut self, value: T) {
+        let mut node = self;
+        loop {
+            match value.cmp(&node.value) {
+                // se o valor a ser inserido é menor que o nó sendo analisado
+                Ordering::Less => {
+                    if let Some(ref mut left_node) = node.left {
+                        node = left_node;
+                    } else {
+                        node.left = Some(Box::new(BinTree::new(value)));
+                        break;
+                    }
+                }
+                // se o valor a ser inserido é maior que o nó sendo analisado
+                Ordering::Greater => {
+                    if let Some(ref mut right_node) = node.right {
+                        node = right_node;
+                    } else {
+                        node.right = Some(Box::new(BinTree::new(value)));
+                        break;
+                    }
+                }
+                // se o valor a ser inserido for igual ao do nó sendo analisado, pular inserção
+                Ordering::Equal => break,
+            }
+        }
+    }
+
     fn numel(&self) -> usize {
         let mut count = 1;
 
@@ -48,6 +71,24 @@ impl<T: Ord> BinTree<T> {
         }
         if let Some(node) = &self.right {
             count += node.numel();
+        }
+
+        count
+    }
+
+    fn numel_iter(&self) -> usize {
+        let mut count = 0;
+        let mut nodes = vec![self];
+
+        while let Some(node) = nodes.pop() {
+            if let Some(ref left) = node.left {
+                nodes.push(left);
+            }
+            if let Some(ref right) = node.right {
+                nodes.push(right);
+            }
+
+            count += 1;
         }
 
         count
@@ -63,18 +104,19 @@ fn main() {
     // let value = buffer.trim().parse().unwrap();
     // root.insert(value);
 
+    println!("Início: número de elementos na árvore: {}", root.numel());
+
     root.insert(19);
     root.insert(23);
     root.insert(21);
-    root.insert(20);
     root.insert(10);
     root.insert(15);
-    root.insert(8);
-    root.insert(14);
-    root.insert(36);
-    root.insert(30);
-    root.insert(0);
-    root.insert(-10);
+    root.insert_iter(8);
+    root.insert_iter(14);
+    root.insert_iter(36);
+    root.insert_iter(30);
+    root.insert_iter(0);
+    root.insert_iter(-10);
 
-    println!("{}", root.numel());
+    println!("Fim: número de elementos na árvore: {}", root.numel_iter());
 }
