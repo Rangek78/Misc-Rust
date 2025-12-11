@@ -1,9 +1,31 @@
 use aluno::*;
-use clearscreen::clear;
 use linked_list::*;
 use std::fmt::{Display, Formatter, Result};
 use std::io::Write;
+use std::process::Command;
 use std::result;
+
+fn clear_terminal() {
+    if cfg!(target_os = "windows") {
+        Command::new("cmd")
+            .args(["/c", "cls"])
+            .status()
+            .expect("Falha ao limpar o terminal");
+    } else {
+        Command::new("clear")
+            .status()
+            .expect("Falha ao limpar o terminal");
+    }
+}
+
+fn ler_campo() -> result::Result<String, String> {
+    let mut campo = String::new();
+    match std::io::stdin().read_line(&mut campo) {
+        Err(_) => return Err(String::from("Erro ao ler texto")),
+        _ => {}
+    }
+    Ok(campo.trim().to_string())
+}
 
 fn inserir_aluno(lista: &mut LinkedList<Aluno>) -> result::Result<(), String> {
     let nomes_campos = vec!["Nome", "Telefone", "Endereço", "Período atual", "Matrícula"];
@@ -17,12 +39,7 @@ fn inserir_aluno(lista: &mut LinkedList<Aluno>) -> result::Result<(), String> {
     for i in 0..=4usize {
         print!("{}: ", nomes_campos[i]);
         std::io::stdout().flush().unwrap();
-
-        let mut buffer = String::new();
-        if std::io::stdin().read_line(&mut buffer).is_err() {
-            return Err(String::from("Erro ao ler texto inserido"));
-        };
-        buffer = buffer.trim().to_string();
+        let buffer = ler_campo()?;
 
         match i {
             0 => nome = buffer,
@@ -51,13 +68,7 @@ fn inserir_aluno(lista: &mut LinkedList<Aluno>) -> result::Result<(), String> {
 fn retirar_aluno(lista: &mut LinkedList<Aluno>) -> result::Result<(), String> {
     print!("Matrícula: ");
     std::io::stdout().flush().unwrap();
-
-    let mut matricula = String::new();
-    std::io::stdin()
-        .read_line(&mut matricula)
-        .expect("Erro ao ler texto");
-    let matricula = matricula.trim().to_string();
-    Edit::remove(lista, &matricula)
+    Edit::remove(lista, &ler_campo()?)
 }
 
 fn imprimir_lista(lista: &LinkedList<Aluno>) {
@@ -65,28 +76,17 @@ fn imprimir_lista(lista: &LinkedList<Aluno>) {
     lista.print();
 }
 
-fn buscar_aluno<'a>(lista: &'a mut LinkedList<Aluno>) -> Option<&'a mut Aluno> {
+fn buscar_aluno<'a>(lista: &'a mut LinkedList<Aluno>) -> result::Result<&'a mut Aluno, String> {
     print!("Matrícula: ");
     std::io::stdout().flush().unwrap();
-
-    let mut matricula = String::new();
-    std::io::stdin()
-        .read_line(&mut matricula)
-        .expect("Erro ao ler texto");
-    let matricula = matricula.trim().to_string();
-    Edit::find(lista, &matricula)
+    let campo = ler_campo()?;
+    Edit::find(lista, &campo)
 }
 
 fn alterar_dados(lista: &mut LinkedList<Aluno>) -> std::result::Result<(), String> {
     print!("Matrícula: ");
     std::io::stdout().flush().unwrap();
-
-    let mut matricula = String::new();
-    std::io::stdin()
-        .read_line(&mut matricula)
-        .expect("Erro ao ler texto");
-    let matricula = matricula.trim().to_string();
-    lista.change(&matricula)
+    lista.change(&ler_campo()?)
 }
 
 fn main() {
@@ -108,15 +108,9 @@ fn main() {
     );
     let mut lista = LinkedList::new();
 
-    match Edit::push(&mut lista, aluno1) {
-        Ok(()) => println!("Sucesso"),
-        Err(e) => println!("{}", e),
-    }
+    let _ = Edit::push(&mut lista, aluno1);
 
-    match Edit::push(&mut lista, aluno2) {
-        Ok(()) => println!("Sucesso"),
-        Err(e) => println!("{}", e),
-    }
+    let _ = Edit::push(&mut lista, aluno2);
 
     println!("Bem-vindo ao sistema de Registro de alunos. Escolha uma opção para começar.");
     loop {
@@ -127,27 +121,29 @@ fn main() {
         println!("5. Editar registro de aluno");
         println!("q. Sair do programa");
 
-        let mut buffer = String::new();
-        std::io::stdin()
-            .read_line(&mut buffer)
-            .expect("Erro ao ler texto");
-        let buffer = buffer.trim();
+        let buffer = ler_campo();
+
+        let buffer = if let Ok(campo) = buffer {
+            &campo.to_lowercase() as &str
+        } else {
+            panic!("Erro ao ler texto")
+        };
 
         match buffer {
             "1" => {
-                clear().expect("Erro ao limpar tela");
+                clear_terminal();
                 imprimir_lista(&lista)
             }
             "2" => {
-                if let Some(encontrado) = buscar_aluno(&mut lista) {
-                    clear().expect("Erro ao limpar tela");
+                if let Ok(encontrado) = buscar_aluno(&mut lista) {
+                    clear_terminal();
                     println!("{:-^18}\n\n{}", "Detalhes", encontrado);
                 } else {
                     println!("Não encontrado na base de dados");
                 }
             }
             "3" => {
-                clear().expect("Erro ao limpar tela");
+                clear_terminal();
                 if let Err(e) = inserir_aluno(&mut lista) {
                     println!("{}", e);
                 } else {
@@ -168,19 +164,18 @@ fn main() {
                     println!("\nSucesso!");
                 }
             }
-            "Q" | "q" => break,
+            "q" => break,
             _ => println!("Opção inválida"),
         }
-        if buffer != "Q" || buffer != "q" {
-            println!("\nPressione Enter para continuar...");
-            let mut buffer = String::new();
-            std::io::stdin()
-                .read_line(&mut buffer)
-                .expect("Erro ao ler texto");
-            clear().expect("Erro ao limpar tela");
-            println!("------Menu inicial------\n");
-            println!("Selecione uma das opções:");
-        }
+
+        println!("\nPressione Enter para continuar...");
+        match ler_campo() {
+            Ok(_) => {}
+            Err(_) => panic!("Erro ao ler o texto"),
+        };
+        clear_terminal();
+        println!("------Menu inicial------\n");
+        println!("Selecione uma das opções:");
     }
 }
 
@@ -262,8 +257,8 @@ mod aluno {
         }
 
         fn change(&mut self, entry: &str) -> std::result::Result<(), Self::Entry> {
-            if let Some(aluno) = self.find(&*entry) {
-                clear().expect("Erro ao limpar tela");
+            if let Ok(aluno) = self.find(&*entry) {
+                clear_terminal();
                 println!("{:-^18}\n\n{}\n", "Detalhes", aluno);
                 println!(
                     "O que deseja alterar?\n1. O nome\n2. Número de Telefone\n3. O endereço\n4. Período atual do aluno\nq. Voltar"
@@ -326,9 +321,9 @@ mod aluno {
             // Conferir o primeiro aluno da lista:
             // Deve ser feita a conferência separadamente do resto da lista devido às.
             if self.head.is_some() && &self.head.as_ref().unwrap().value.matr == entry {
-                clear().expect("Erro ao limpar tela");
+                clear_terminal();
                 println!(
-                    "{:-^24}\n\n{}",
+                    "{:-^24}\n\n{}\n",
                     "Aluno encontrado",
                     self.head.as_ref().unwrap().value
                 );
@@ -349,9 +344,9 @@ mod aluno {
                 if let Some(prox) = node.next.as_mut() {
                     if &prox.value.matr == entry {
                         // O aluno prox será removido (node.next)
-                        clear().expect("Erro ao limpar tela");
+                        clear_terminal();
                         println!(
-                            "{:-^24}\n\n{}",
+                            "{:-^24}\n\n{}\n",
                             "Aluno encontrado",
                             node.next.as_ref().unwrap().value
                         );
@@ -378,19 +373,19 @@ mod aluno {
             return Err(String::from("Aluno não encontrado"));
         }
 
-        fn find(&mut self, entry: &str) -> Option<&mut Self::Value> {
+        fn find(&mut self, entry: &str) -> result::Result<&mut Self::Value, String> {
             match &mut self.head {
-                None => return None,
+                None => return Err(String::from("Lista está vazia")),
                 Some(item) => {
                     let mut aluno = item;
                     while &aluno.value.matr != entry {
                         if let Some(ref mut seguinte) = aluno.next {
                             aluno = seguinte;
                         } else {
-                            return None;
+                            return Err(String::from("Aluno não encontrado na base de dados"));
                         }
                     }
-                    Some(&mut aluno.value)
+                    Ok(&mut aluno.value)
                 }
             }
         }
@@ -441,7 +436,7 @@ mod linked_list {
         fn push(&mut self, value: Self::Value) -> std::result::Result<(), Self::Entry>;
         fn change(&mut self, entry: &str) -> std::result::Result<(), Self::Entry>;
         fn remove(&mut self, entry: &str) -> std::result::Result<(), Self::Entry>;
-        fn find(&mut self, entry: &str) -> Option<&mut Self::Value>;
+        fn find(&mut self, entry: &str) -> std::result::Result<&mut Self::Value, Self::Entry>;
         fn print(&self);
     }
 
