@@ -67,6 +67,8 @@ fn insertion_sort<T: PartialOrd>(list: &mut [T]) -> &[T] {
             if list[j - 1] > list[j] {
                 assignments += 3;
                 list.swap(j, j - 1);
+            } else {
+                break;
             }
         }
     }
